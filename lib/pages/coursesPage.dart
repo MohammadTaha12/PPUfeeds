@@ -201,16 +201,23 @@ class CoursesPageState extends State<CoursesPage> {
                               ),
                               subtitle: Text(
                                   "Lecturer: ${section['lecturer'] ?? 'N/A'}"),
-                              trailing: TextButton(
+                              trailing: ElevatedButton(
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor:
+                                      isSubscribed ? Colors.red : Colors.green,
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(10),
+                                  ),
+                                ),
                                 onPressed: () {
                                   _toggleSubscription(section['id']);
                                 },
                                 child: Text(
                                   isSubscribed ? "Unsubscribe" : "Subscribe",
                                   style: TextStyle(
-                                      color: isSubscribed
-                                          ? Colors.red
-                                          : Colors.green),
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.bold,
+                                  ),
                                 ),
                               ),
                               onTap: () {
