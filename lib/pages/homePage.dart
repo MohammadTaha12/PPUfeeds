@@ -1,60 +1,89 @@
-// ignore_for_file: prefer_const_constructors
-
 import 'package:flutter/material.dart';
-import 'coursesPage.dart';
+import 'package:flutter_application_3/pages/coursesPage.dart';
+import 'package:flutter_application_3/viewmodels/home_viewmodel.dart';
+import '../classes/course.dart';
+import 'postsPage.dart';
 
-class HomeScreen extends StatefulWidget {
+class HomePage extends StatefulWidget {
   @override
-  _HomeScreenState createState() => _HomeScreenState();
+  HomePageState createState() => HomePageState();
 }
 
-class _HomeScreenState extends State<HomeScreen> {
-  List<dynamic> subscribedSections = [];
+class HomePageState extends State<HomePage> {
+  final HomeViewModel _viewModel = HomeViewModel();
+  List<Course> subscribedCourses = [];
+  bool isLoading = true;
 
   @override
   void initState() {
     super.initState();
-    _fetchSubscribedSections();
+    _fetchSubscribedCourses();
   }
 
-  Future<void> _fetchSubscribedSections() async {
-    setState(() {
-      subscribedSections = [
-        {
-          "course_name": "Course A",
-          "section_name": "Section 1",
-          "lecturer": "Dr. Smith"
-        },
-        {
-          "course_name": "Course B",
-          "section_name": "Section 2",
-          "lecturer": "Dr. Jane"
-        },
-      ];
-    });
+  // جلب الشعب المشتركة
+  Future<void> _fetchSubscribedCourses() async {
+    try {
+      final fetchedCourses = await _viewModel.fetchSubscribedCourses();
+      setState(() {
+        subscribedCourses = fetchedCourses;
+        isLoading = false;
+      });
+    } catch (e) {
+      _showErrorDialog("Error fetching subscribed sections: $e");
+    }
+  }
+
+  // إلغاء الاشتراك
+  Future<void> _unsubscribe(int courseId, int sectionId) async {
+    try {
+      await _viewModel.toggleSubscription(courseId, sectionId);
+      setState(() {
+        subscribedCourses.removeWhere((course) => course.id == sectionId);
+      });
+    } catch (e) {
+      _showErrorDialog("Error while unsubscribing: $e");
+    }
+  }
+
+  // عرض رسالة خطأ
+  void _showErrorDialog(String message) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text("Error"),
+        content: Text(message),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: Text("OK"),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text("Home"),
+        title: Text("My Subscribed Sections"),
         backgroundColor: Colors.deepPurple,
       ),
       drawer: Drawer(
         child: ListView(
+          padding: EdgeInsets.zero,
           children: [
             DrawerHeader(
-              decoration: BoxDecoration(color: Colors.deepPurple),
-              child: Center(
-                child: Text(
-                  "My App",
-                  style: TextStyle(color: Colors.white, fontSize: 24),
-                ),
+              decoration: BoxDecoration(
+                color: Colors.deepPurple,
+              ),
+              child: Text(
+                "Menu",
+                style: TextStyle(color: Colors.white, fontSize: 24),
               ),
             ),
             ListTile(
-              leading: Icon(Icons.school),
+              leading: Icon(Icons.list),
               title: Text("Courses"),
               onTap: () {
                 Navigator.push(
@@ -66,25 +95,48 @@ class _HomeScreenState extends State<HomeScreen> {
           ],
         ),
       ),
-      body: subscribedSections.isEmpty
-          ? Center(child: Text("No subscribed sections."))
-          : ListView.builder(
-              itemCount: subscribedSections.length,
-              itemBuilder: (context, index) {
-                final section = subscribedSections[index];
-                return Card(
-                  margin: EdgeInsets.all(10),
-                  child: ListTile(
-                    leading: Icon(Icons.class_, color: Colors.deepPurpleAccent),
-                    title: Text(
-                      "${section['course_name']} - ${section['section_name']}",
-                      style: TextStyle(fontWeight: FontWeight.bold),
-                    ),
-                    subtitle: Text("Lecturer: ${section['lecturer']}"),
-                  ),
-                );
-              },
-            ),
+      body: isLoading
+          ? Center(child: CircularProgressIndicator())
+          : subscribedCourses.isEmpty
+              ? Center(child: Text("No subscribed sections found."))
+              : ListView.builder(
+                  itemCount: subscribedCourses.length,
+                  itemBuilder: (context, index) {
+                    final course = subscribedCourses[index];
+                    return Card(
+                      margin: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                      child: ListTile(
+                        leading: CircleAvatar(
+                          backgroundColor: Colors.deepPurple,
+                          child: Text(
+                            course.name.isNotEmpty
+                                ? course.name[0]
+                                : "S", // عرض أول حرف من اسم الشعبة
+                            style: TextStyle(color: Colors.white),
+                          ),
+                        ),
+                        title: Text(course.name),
+                        subtitle: Text("Section: ${course.college}"),
+                        trailing: IconButton(
+                          icon: Icon(Icons.delete, color: Colors.redAccent),
+                          onPressed: () =>
+                              _unsubscribe(course.collegeId, course.id),
+                        ),
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => CoursePostsScreen(
+                                courseId: course.collegeId,
+                                sectionId: course.id,
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                    );
+                  },
+                ),
     );
   }
 }

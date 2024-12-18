@@ -1,238 +1,164 @@
-// ignore_for_file: prefer_const_constructors, prefer_final_fields
+// ignore_for_file: prefer_const_constructors, unnecessary_to_list_in_spreads
 
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
-import 'dart:convert';
-import 'package:shared_preferences/shared_preferences.dart';
-import 'postsPage.dart';
+import '../viewmodels/courses_viewmodel.dart';
+import 'homePage.dart';
 
 class CoursesPage extends StatefulWidget {
   @override
-  CoursesPageState createState() => CoursesPageState();
+  _CoursesPageState createState() => _CoursesPageState();
 }
 
-class CoursesPageState extends State<CoursesPage> {
-  List<dynamic> courses = [];
-  Map<int, List<dynamic>> sections = {};
-  Set<int> _expandedCourses = {};
-  Set<int> subscribedSections = {};
+class _CoursesPageState extends State<CoursesPage> {
+  final CoursesViewModel viewModel = CoursesViewModel();
   bool isLoading = true;
+  Set<int> expandedCourses = {}; // لتتبع الكورسات المعروضة
 
   @override
   void initState() {
     super.initState();
-    _fetchCourses();
+    _loadData();
   }
 
-  Future<void> _fetchCourses() async {
-    final prefs = await SharedPreferences.getInstance();
-    final token = prefs.getString('token') ?? '';
+  Future<void> _loadData() async {
+    setState(() => isLoading = true);
+    await viewModel.fetchSubscribedSections(); // جلب الشعب المشتركة
+    await viewModel.fetchCourses(); // جلب جميع الكورسات
+    setState(() => isLoading = false);
+  }
 
-    try {
-      final response = await http.get(
-        Uri.parse("http://feeds.ppu.edu/api/v1/courses"),
-        headers: {
-          'Authorization': token,
-        },
-      );
-
-      if (response.statusCode == 200) {
-        setState(() {
-          courses = json.decode(response.body)['courses'];
-          isLoading = false;
-        });
-      } else {
-        _showErrorDialog("Failed to load courses.");
+  void _toggleCourseExpansion(int courseId) async {
+    if (expandedCourses.contains(courseId)) {
+      // إذا كانت الكورس بالفعل في حالة توسع، قم بإغلاقه
+      setState(() {
+        expandedCourses.remove(courseId);
+      });
+    } else {
+      // إذا لم تكن موجودة، أضفها وتحقق إذا الشعب تم جلبها
+      if (!viewModel.sections.containsKey(courseId)) {
+        await viewModel.fetchSections(courseId); // جلب الشعب فقط أول مرة
       }
-    } catch (e) {
-      _showErrorDialog("An error occurred: $e");
+      setState(() {
+        expandedCourses.add(courseId);
+      });
     }
-  }
-
-  Future<void> _fetchSections(int courseId) async {
-    if (sections.containsKey(courseId)) return;
-    final prefs = await SharedPreferences.getInstance();
-    final token = prefs.getString('token') ?? '';
-
-    try {
-      final response = await http.get(
-        Uri.parse("http://feeds.ppu.edu/api/v1/courses/$courseId/sections"),
-        headers: {
-          'Authorization': token,
-        },
-      );
-
-      if (response.statusCode == 200) {
-        setState(() {
-          sections[courseId] = json.decode(response.body)['sections'];
-        });
-      } else {
-        _showErrorDialog("Failed to load sections for course $courseId.");
-      }
-    } catch (e) {
-      _showErrorDialog("An error occurred: $e");
-    }
-  }
-
-  Future<void> _toggleSubscription(int sectionId) async {
-    final prefs = await SharedPreferences.getInstance();
-    final token = prefs.getString('token') ?? '';
-    final isSubscribed = subscribedSections.contains(sectionId);
-
-    try {
-      final response = await http.post(
-        Uri.parse(
-            "http://feeds.ppu.edu/api/v1/sections/$sectionId/${isSubscribed ? 'unsubscribe' : 'subscribe'}"),
-        headers: {
-          'Authorization': token,
-        },
-      );
-
-      if (response.statusCode == 200) {
-        setState(() {
-          if (isSubscribed) {
-            subscribedSections.remove(sectionId);
-          } else {
-            subscribedSections.add(sectionId);
-          }
-        });
-      } else {
-        _showErrorDialog(
-            "Failed to ${isSubscribed ? 'unsubscribe from' : 'subscribe to'} section $sectionId.");
-      }
-    } catch (e) {
-      _showErrorDialog("An error occurred: $e");
-    }
-  }
-
-  void _showErrorDialog(String message) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text("Error"),
-        content: Text(message),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: Text("OK"),
-          ),
-        ],
-      ),
-    );
-  }
-
-  String _getInitials(String courseName) {
-    List<String> words = courseName.split(" ");
-    if (words.length >= 2) {
-      return "${words[0][0]}${words[1][0]}".toUpperCase();
-    }
-    return courseName.substring(0, 2).toUpperCase();
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text("Courses"),
+        title: Text("Feeds Screen"),
         backgroundColor: Colors.deepPurple,
+      ),
+      drawer: Drawer(
+        child: ListView(
+          children: [
+            DrawerHeader(
+              decoration: BoxDecoration(color: Colors.deepPurple),
+              child: Center(
+                child: Text(
+                  "My App",
+                  style: TextStyle(color: Colors.white, fontSize: 24),
+                ),
+              ),
+            ),
+            ListTile(
+              leading: Icon(Icons.home),
+              title: Text("Home"),
+              onTap: () => Navigator.pushReplacement(
+                context,
+                MaterialPageRoute(builder: (context) => HomePage()),
+              ),
+            ),
+          ],
+        ),
       ),
       body: isLoading
           ? Center(child: CircularProgressIndicator())
           : ListView.builder(
-              itemCount: courses.length,
-              padding: EdgeInsets.all(10),
+              itemCount: viewModel.courses.length,
               itemBuilder: (context, index) {
-                final course = courses[index];
-                final isExpanded = _expandedCourses.contains(course['id']);
+                final course = viewModel.courses[index];
+                final isExpanded = expandedCourses.contains(course.id);
                 return Card(
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(15),
                   ),
                   elevation: 5,
-                  margin: EdgeInsets.symmetric(vertical: 8),
+                  margin: EdgeInsets.all(8),
                   child: Column(
                     children: [
                       ListTile(
                         leading: CircleAvatar(
                           backgroundColor: Colors.deepPurpleAccent,
                           child: Text(
-                            _getInitials(course['name']),
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontWeight: FontWeight.bold,
-                              fontSize: 18,
-                            ),
+                            course.name.substring(0, 2).toUpperCase(),
+                            style: TextStyle(color: Colors.white),
                           ),
                         ),
-                        title: Text(
-                          course['name'],
-                          style: TextStyle(fontWeight: FontWeight.bold),
+                        title: Text(course.name),
+                        subtitle: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text("College: ${course.college}"),
+                          ],
                         ),
-                        subtitle: Text("College: ${course['college']}"),
                         trailing: IconButton(
                           icon: Icon(
                             isExpanded ? Icons.expand_less : Icons.expand_more,
                             color: Colors.deepPurple,
                           ),
-                          onPressed: () {
-                            setState(() {
-                              if (isExpanded) {
-                                _expandedCourses.remove(course['id']);
-                              } else {
-                                _expandedCourses.add(course['id']);
-                                _fetchSections(course['id']);
-                              }
-                            });
-                          },
+                          onPressed: () => _toggleCourseExpansion(course.id),
                         ),
                       ),
                       if (isExpanded)
                         Column(
-                          children: (sections[course['id']] ?? [])
-                              .map<Widget>((section) {
-                            final isSubscribed =
-                                subscribedSections.contains(section['id']);
-                            return ListTile(
-                              leading: Icon(Icons.class_,
-                                  color: Colors.deepPurpleAccent),
-                              title: Text(
-                                "Section: ${section['name']}",
-                                style: TextStyle(fontWeight: FontWeight.bold),
-                              ),
-                              subtitle: Text(
-                                  "Lecturer: ${section['lecturer'] ?? 'N/A'}"),
-                              trailing: ElevatedButton(
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor:
-                                      isSubscribed ? Colors.red : Colors.green,
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(10),
-                                  ),
-                                ),
-                                onPressed: () {
-                                  _toggleSubscription(section['id']);
-                                },
+                          children: [
+                            if (viewModel.sections[course.id] == null)
+                              Padding(
+                                padding: const EdgeInsets.all(8.0),
                                 child: Text(
-                                  isSubscribed ? "Unsubscribe" : "Subscribe",
+                                  "No sections available for this course.",
                                   style: TextStyle(
-                                    color: Colors.white,
-                                    fontWeight: FontWeight.bold,
-                                  ),
+                                      color: Colors.grey, fontSize: 16),
                                 ),
-                              ),
-                              onTap: () {
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (context) => CoursePostsScreen(
-                                      courseId: course['id'],
-                                      sectionId: section['id'],
+                              )
+                            else if (viewModel.sections[course.id]!.isEmpty)
+                              Padding(
+                                padding: const EdgeInsets.all(8.0),
+                                child: Text(
+                                  "No sections available for this course.",
+                                  style: TextStyle(
+                                      color: Colors.grey, fontSize: 16),
+                                ),
+                              )
+                            else
+                              ...viewModel.sections[course.id]!.map((section) {
+                                final isSubscribed = viewModel.subscriptions
+                                    .containsKey(section.id);
+                                return ListTile(
+                                  title: Text("Section: ${section.name}"),
+                                  subtitle:
+                                      Text("Lecturer: ${section.lecturer}"),
+                                  trailing: ElevatedButton(
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: isSubscribed
+                                          ? Colors.red
+                                          : Colors.green,
                                     ),
+                                    onPressed: () async {
+                                      await viewModel.toggleSubscription(
+                                          course.id, section.id);
+                                      setState(() {});
+                                    },
+                                    child: Text(isSubscribed
+                                        ? "Unsubscribe"
+                                        : "Subscribe"),
                                   ),
                                 );
-                              },
-                            );
-                          }).toList(),
+                              }).toList(),
+                          ],
                         ),
                     ],
                   ),

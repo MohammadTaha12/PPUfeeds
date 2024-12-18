@@ -2,13 +2,13 @@ class Course {
   final int id;
   final String name;
   final String college;
-  final List<dynamic> sections; 
+  final int collegeId;
 
   Course({
     required this.id,
     required this.name,
     required this.college,
-    this.sections = const [],
+    required this.collegeId,
   });
 
   factory Course.fromJson(Map<String, dynamic> json) {
@@ -16,7 +16,7 @@ class Course {
       id: json['id'],
       name: json['name'],
       college: json['college'],
-      sections: json['sections'] ?? [],
+      collegeId: json['college_id'],
     );
   }
 }

@@ -1,9 +1,7 @@
 // ignore_for_file: prefer_const_constructors, use_key_in_widget_constructors, use_build_context_synchronously
 import 'package:flutter/material.dart';
 import './homePage.dart';
-import 'package:http/http.dart' as http;
-import 'dart:convert';
-import 'package:shared_preferences/shared_preferences.dart';
+import '../viewmodels/login_viewmodel.dart';
 
 class LoginPage extends StatefulWidget {
   @override
@@ -15,51 +13,30 @@ class LoginPage extends StatefulWidget {
 class LoginPageState extends State<LoginPage> {
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
-  final String loginUrl = "http://feeds.ppu.edu/api/login";
+  final LoginViewModel _loginViewModel = LoginViewModel();
   bool isLoading = false;
 
   Future<void> _login() async {
-    if (_emailController.text.isEmpty || _passwordController.text.isEmpty) {
-      _showErrorDialog("Please enter both email and password.");
-      return;
-    }
-
     setState(() {
       isLoading = true;
     });
 
     try {
-      final response = await http.post(
-        Uri.parse(loginUrl),
-        headers: {'Content-Type': 'application/json'},
-        body: json.encode({
-          "email": _emailController.text,
-          "password": _passwordController.text,
-        }),
+      await _loginViewModel.login(
+        _emailController.text,
+        _passwordController.text,
       );
 
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (context) => HomePage()),
+      );
+    } catch (e) {
+      _showErrorDialog(e.toString());
+    } finally {
       setState(() {
         isLoading = false;
       });
-
-      if (response.statusCode == 200) {
-        dynamic jsonObject = jsonDecode(response.body);
-        if (jsonObject['status'] == 'success') {
-          String token = jsonObject['session_token'];
-          final prefs = await SharedPreferences.getInstance();
-          prefs.setString('token', token);
-          Navigator.pushReplacement(
-            context,
-            MaterialPageRoute(builder: (context) => HomeScreen()),
-          );
-        } else {
-          _showErrorDialog("Login failed. Please check your credentials.");
-        }
-      } else {
-        _showErrorDialog("Error: ${response.statusCode}");
-      }
-    } catch (e) {
-      _showErrorDialog("An error occurred: $e");
     }
   }
 

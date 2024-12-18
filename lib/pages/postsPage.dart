@@ -1,59 +1,81 @@
-// ignore_for_file: prefer_const_constructors, library_private_types_in_public_api, prefer_const_constructors_in_immutables, use_key_in_widget_constructors
+// ignore_for_file: prefer_const_constructors
+
 import 'package:flutter/material.dart';
-import 'package:flutter_application_3/pages/commentsPage.dart';
-import 'package:http/http.dart' as http;
-import 'dart:convert';
-import 'package:shared_preferences/shared_preferences.dart';
+import '/viewmodels/posts_viewmodel.dart';
+import '../classes/post.dart';
+import 'commentsPage.dart';
 
 class CoursePostsScreen extends StatefulWidget {
   final int courseId;
   final int sectionId;
 
-  CoursePostsScreen({required this.courseId, required this.sectionId});
+  const CoursePostsScreen({required this.courseId, required this.sectionId});
 
   @override
-  CoursePostsScreenState createState() => CoursePostsScreenState();
+  _CoursePostsScreenState createState() => _CoursePostsScreenState();
 }
 
-class CoursePostsScreenState extends State<CoursePostsScreen> {
-  List<dynamic> posts = [];
+class _CoursePostsScreenState extends State<CoursePostsScreen> {
+  final TextEditingController _postController = TextEditingController();
+  final TextEditingController _editPostController = TextEditingController();
   bool isLoading = true;
+  int? editingPostId;
+  bool isAddingPost = false;
+  List<Post> posts = [];
+  late CoursePostsViewModel viewModel;
 
   @override
   void initState() {
     super.initState();
+    viewModel = CoursePostsViewModel(
+      courseId: widget.courseId,
+      sectionId: widget.sectionId,
+    );
     _fetchPosts();
   }
 
   Future<void> _fetchPosts() async {
+    setState(() {
+      isLoading = true;
+    });
     try {
-      final prefs = await SharedPreferences.getInstance();
-      final token = prefs.getString('token') ?? '';
-
-      if (token.isEmpty) {
-        _showErrorDialog(
-            "Authentication token not found. Please log in again.");
-        return;
-      }
-
-      final response = await http.get(
-        Uri.parse(
-            "http://feeds.ppu.edu/api/v1/courses/${widget.courseId}/sections/${widget.sectionId}/posts"),
-        headers: {
-          'Authorization': token,
-        },
-      );
-
-      if (response.statusCode == 200) {
-        setState(() {
-          posts = json.decode(response.body)['posts'];
-          isLoading = false;
-        });
-      } else {
-        _showErrorDialog("Failed to load posts.");
-      }
+      posts = await viewModel.fetchPosts();
     } catch (e) {
-      _showErrorDialog("An error occurred: $e");
+      _showErrorDialog("Failed to load posts: $e");
+    } finally {
+      setState(() {
+        isLoading = false;
+      });
+    }
+  }
+
+  Future<void> _addPost() async {
+    final postContent = _postController.text.trim();
+    if (postContent.isEmpty) {
+      _showErrorDialog("Post content cannot be empty.");
+      return;
+    }
+    try {
+      await viewModel.addPost(postContent);
+      _postController.clear();
+      _fetchPosts();
+    } catch (e) {
+      _showErrorDialog("Failed to add post: $e");
+    }
+  }
+
+  Future<void> _updatePost(int postId) async {
+    final updatedContent = _editPostController.text.trim();
+    if (updatedContent.isEmpty) return;
+    try {
+      await viewModel.updatePost(postId, updatedContent);
+      setState(() {
+        editingPostId = null;
+        _editPostController.clear();
+      });
+      _fetchPosts();
+    } catch (e) {
+      _showErrorDialog("Failed to update post: $e");
     }
   }
 
@@ -73,67 +95,226 @@ class CoursePostsScreenState extends State<CoursePostsScreen> {
     );
   }
 
+  Widget _buildAddPostSection() {
+    return Padding(
+      padding: const EdgeInsets.all(8.0),
+      child: Column(
+        children: [
+          Row(
+            children: [
+              CircleAvatar(
+                backgroundColor: Colors.grey.shade300,
+                child: Icon(Icons.person, color: Colors.black),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: GestureDetector(
+                  onTap: () {
+                    setState(() {
+                      isAddingPost = true;
+                    });
+                  },
+                  child: Container(
+                    padding: EdgeInsets.symmetric(horizontal: 10, vertical: 15),
+                    decoration: BoxDecoration(
+                      border: Border.all(color: Colors.grey),
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Text(
+                      "Write something...",
+                      style: TextStyle(color: Colors.grey),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          if (isAddingPost) ...[
+            const SizedBox(height: 10),
+            TextField(
+              controller: _postController,
+              maxLines: 3,
+              decoration: InputDecoration(
+                hintText: "What's on your mind?",
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(20),
+                ),
+              ),
+            ),
+            const SizedBox(height: 10),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                ElevatedButton(
+                  onPressed: () {
+                    setState(() {
+                      isAddingPost = false;
+                      _postController.clear();
+                    });
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.redAccent,
+                  ),
+                  child: Text("Cancel", style: TextStyle(color: Colors.white)),
+                ),
+                const SizedBox(width: 10),
+                ElevatedButton(
+                  onPressed: _addPost,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.redAccent,
+                  ),
+                  child: Text("Add", style: TextStyle(color: Colors.white)),
+                ),
+              ],
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPostItem(Post post) {
+    return Card(
+      margin: EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+      elevation: 3,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          ListTile(
+            leading: CircleAvatar(
+              backgroundColor: Colors.grey.shade300,
+              child: Text(post.author[0].toUpperCase()),
+            ),
+            title: Text(
+              post.author,
+              style: TextStyle(fontWeight: FontWeight.bold),
+            ),
+            subtitle: Text(post.datePosted),
+            trailing: PopupMenuButton<String>(
+              onSelected: (value) {
+                if (value == 'Edit') {
+                  setState(() {
+                    editingPostId = post.id;
+                    _editPostController.text = post.body;
+                  });
+                }
+              },
+              itemBuilder: (context) => [
+                PopupMenuItem(
+                  value: 'Edit',
+                  child: Text('Edit'),
+                ),
+              ],
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: editingPostId == post.id
+                ? Column(
+                    children: [
+                      TextField(
+                        controller: _editPostController,
+                        maxLines: 2,
+                        decoration: InputDecoration(
+                          hintText: "Edit your post...",
+                          border: OutlineInputBorder(),
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.end,
+                        children: [
+                          ElevatedButton(
+                            onPressed: () {
+                              setState(() {
+                                editingPostId = null;
+                                _editPostController.clear();
+                              });
+                            },
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.redAccent,
+                            ),
+                            child: Text("Cancel",
+                                style: TextStyle(color: Colors.white)),
+                          ),
+                          const SizedBox(width: 8),
+                          ElevatedButton(
+                            onPressed: () => _updatePost(post.id),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.redAccent,
+                            ),
+                            child: Text("Save",
+                                style: TextStyle(color: Colors.white)),
+                          ),
+                        ],
+                      ),
+                    ],
+                  )
+                : Text(
+                    post.body,
+                    style: TextStyle(fontSize: 16),
+                  ),
+          ),
+          Align(
+            alignment: Alignment.centerRight,
+            child: Padding(
+              padding: const EdgeInsets.only(right: 16, bottom: 10),
+              child: ElevatedButton.icon(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.redAccent,
+                ),
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => CommentsPage(
+                        courseId: widget.courseId,
+                        sectionId: widget.sectionId,
+                        postId: post.id,
+                      ),
+                    ),
+                  );
+                },
+                icon: Icon(Icons.comment, color: Colors.white),
+                label: Text(
+                  "View Comments",
+                  style: TextStyle(color: Colors.white),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
         title: Text("Posts"),
-        backgroundColor: Colors.deepPurple,
+        backgroundColor: Colors.redAccent,
       ),
-      body: isLoading
-          ? Center(child: CircularProgressIndicator())
-          : posts.isEmpty
-              ? Center(
-                  child: Text(
-                    "No posts available.",
-                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                  ),
-                )
-              : ListView.builder(
-                  itemCount: posts.length,
-                  itemBuilder: (context, index) {
-                    final post = posts[index];
-                    return Card(
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(15),
+      body: Column(
+        children: [
+          _buildAddPostSection(),
+          Expanded(
+            child: isLoading
+                ? Center(child: CircularProgressIndicator())
+                : posts.isEmpty
+                    ? Center(child: Text("No posts available."))
+                    : ListView.builder(
+                        itemCount: posts.length,
+                        itemBuilder: (context, index) {
+                          return _buildPostItem(posts[index]);
+                        },
                       ),
-                      margin: EdgeInsets.all(10),
-                      elevation: 5,
-                      child: Column(
-                        children: [
-                          ListTile(
-                            title: Text(
-                              post['body'] ?? 'No content',
-                              style: TextStyle(fontWeight: FontWeight.bold),
-                            ),
-                            subtitle: Text("Posted on: ${post['date_posted']}"),
-                          ),
-                          OverflowBar(
-                            alignment: MainAxisAlignment.start,
-                            children: [
-                              TextButton.icon(
-                                onPressed: () {
-                                  Navigator.push(
-                                    context,
-                                    MaterialPageRoute(
-                                      builder: (context) => CommentsScreen(
-                                        courseId: widget.courseId,
-                                        sectionId: widget.sectionId,
-                                        postId: post['id'],
-                                      ),
-                                    ),
-                                  );
-                                },
-                                icon: Icon(Icons.comment),
-                                label: Text("Comments"),
-                              ),
-                            ],
-                          ),
-                        ],
-                      ),
-                    );
-                  },
-                ),
+          ),
+        ],
+      ),
     );
   }
 }

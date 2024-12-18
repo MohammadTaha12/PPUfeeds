@@ -1,117 +1,109 @@
-// ignore_for_file: prefer_const_constructors, prefer_const_constructors_in_immutables, use_key_in_widget_constructors, library_private_types_in_public_api
-
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
-import 'dart:convert';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:flutter_application_3/viewmodels/comments_viewmodel.dart';
+import '../classes/comment.dart';
 
-class CommentsScreen extends StatefulWidget {
+class CommentsPage extends StatefulWidget {
   final int courseId;
   final int sectionId;
   final int postId;
 
-  CommentsScreen({
+  const CommentsPage({
     required this.courseId,
     required this.sectionId,
     required this.postId,
   });
 
   @override
-  CommentsScreenState createState() => CommentsScreenState();
+  _CommentsPageState createState() => _CommentsPageState();
 }
 
-class CommentsScreenState extends State<CommentsScreen> {
-  List<dynamic> comments = [];
-  bool isLoading = true;
+class _CommentsPageState extends State<CommentsPage> {
+  final CommentsViewModel _viewModel = CommentsViewModel();
+  final TextEditingController _commentController = TextEditingController();
+  final TextEditingController _editCommentController = TextEditingController();
+  int? editingCommentId;
 
   @override
   void initState() {
     super.initState();
-    _fetchComments();
+    _viewModel.fetchComments(widget.courseId, widget.sectionId, widget.postId);
   }
 
-  Future<void> _fetchComments() async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final token = prefs.getString('token') ?? '';
-
-      if (token.isEmpty) {
-        _showErrorDialog(
-            "Authentication token not found. Please log in again.");
-        return;
-      }
-
-      final response = await http.get(
-        Uri.parse(
-            "http://feeds.ppu.edu/api/v1/courses/${widget.courseId}/sections/${widget.sectionId}/posts/${widget.postId}/comments"),
-        headers: {
-          'Authorization': token,
-        },
-      );
-
-      if (response.statusCode == 200) {
-        setState(() {
-          comments =
-              (json.decode(response.body)['comments'] as List).map((comment) {
-            comment['liked'] = comment['liked'] ?? false;
-            comment['likes_count'] = comment['likes_count'] ?? 0;
-            return comment;
-          }).toList();
-          isLoading = false;
-        });
-      } else {
-        _showErrorDialog("Failed to load comments.");
-      }
-    } catch (e) {
-      _showErrorDialog("An error occurred: $e");
-    }
-  }
-
-  Future<void> _toggleLike(int commentId, int index) async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final token = prefs.getString('token') ?? '';
-
-      if (token.isEmpty) {
-        _showErrorDialog(
-            "Authentication token not found. Please log in again.");
-        return;
-      }
-
-      final response = await http.post(
-        Uri.parse(
-            "http://feeds.ppu.edu/api/v1/courses/${widget.courseId}/sections/${widget.sectionId}/posts/${widget.postId}/comments/$commentId/like"),
-        headers: {
-          'Authorization': token,
-          'Content-Type': 'application/json',
-        },
-      );
-
-      if (response.statusCode == 200) {
-        setState(() {
-          comments[index]['liked'] = !comments[index]['liked'];
-          comments[index]['likes_count'] = comments[index]['liked']
-              ? comments[index]['likes_count'] + 1
-              : comments[index]['likes_count'] - 1;
-        });
-      } else {
-        _showErrorDialog("Failed to toggle like.");
-      }
-    } catch (e) {
-      _showErrorDialog("An error occurred: $e");
-    }
-  }
-
-  void _showErrorDialog(String message) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text("Error"),
-        content: Text(message),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: Text("OK"),
+  Widget _buildCommentItem(Comment comment) {
+    return Container(
+      margin: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+      padding: const EdgeInsets.all(8),
+      decoration: BoxDecoration(
+        border: Border.all(color: Colors.grey.shade300),
+        borderRadius: BorderRadius.circular(10),
+        color: Colors.white,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              CircleAvatar(child: Text(comment.author[0].toUpperCase())),
+              const SizedBox(width: 10),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    comment.author,
+                    style: const TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                  Text(
+                    comment.datePosted,
+                    style: const TextStyle(color: Colors.grey, fontSize: 12),
+                  ),
+                ],
+              ),
+              const Spacer(),
+              editingCommentId == comment.id
+                  ? IconButton(
+                      icon: const Icon(Icons.check, color: Colors.green),
+                      onPressed: () => _viewModel.editComment(widget,
+                          comment.id, _editCommentController.text.trim(), () {
+                        setState(() => editingCommentId = null);
+                      }),
+                    )
+                  : IconButton(
+                      icon: const Icon(Icons.edit, color: Colors.orange),
+                      onPressed: () {
+                        setState(() {
+                          editingCommentId = comment.id;
+                          _editCommentController.text = comment.body;
+                        });
+                      },
+                    ),
+              IconButton(
+                icon: const Icon(Icons.delete, color: Colors.red),
+                onPressed: () => _viewModel.deleteComment(widget, comment.id),
+              ),
+            ],
+          ),
+          const SizedBox(height: 5),
+          editingCommentId == comment.id
+              ? TextField(
+                  controller: _editCommentController,
+                  decoration: const InputDecoration(
+                    border: OutlineInputBorder(),
+                  ),
+                )
+              : Text(comment.body),
+          Row(
+            children: [
+              IconButton(
+                icon: Icon(
+                  comment.isLiked
+                      ? Icons.thumb_up
+                      : Icons.thumb_up_alt_outlined,
+                  color: comment.isLiked ? Colors.blue : Colors.grey,
+                ),
+                onPressed: () => _viewModel.toggleLike(widget, comment),
+              ),
+              Text("${comment.likesCount} Likes"),
+            ],
           ),
         ],
       ),
@@ -121,100 +113,49 @@ class CommentsScreenState extends State<CommentsScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: Text("Comments"),
-        backgroundColor: Colors.deepPurple,
-      ),
-      body: isLoading
-          ? Center(child: CircularProgressIndicator())
-          : comments.isEmpty
-              ? Center(
-                  child: Text(
-                    "No comments available.",
-                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+      appBar: AppBar(title: const Text("Comments")),
+      body: Column(
+        children: [
+          Expanded(
+            child: StreamBuilder<List<Comment>>(
+              stream: _viewModel.commentsStream,
+              builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return const Center(child: CircularProgressIndicator());
+                } else if (snapshot.hasError) {
+                  return Center(child: Text(snapshot.error.toString()));
+                } else {
+                  final comments = snapshot.data ?? [];
+                  return ListView.builder(
+                    itemCount: comments.length,
+                    itemBuilder: (context, index) =>
+                        _buildCommentItem(comments[index]),
+                  );
+                }
+              },
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.all(8.0),
+            child: Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: _commentController,
+                    decoration:
+                        const InputDecoration(hintText: "Add a comment..."),
                   ),
-                )
-              : ListView.builder(
-                  itemCount: comments.length,
-                  itemBuilder: (ctx, index) {
-                    final comment = comments[index];
-                    return Padding(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 10, vertical: 5),
-                      child: Card(
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(15),
-                        ),
-                        elevation: 4,
-                        child: Padding(
-                          padding: const EdgeInsets.all(16.0),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Row(
-                                children: [
-                                  CircleAvatar(
-                                    backgroundColor: Colors.deepPurpleAccent,
-                                    child: Text(
-                                      comment['user_name']
-                                              ?.substring(0, 1)
-                                              ?.toUpperCase() ??
-                                          "U",
-                                      style: TextStyle(color: Colors.white),
-                                    ),
-                                  ),
-                                  SizedBox(width: 10),
-                                  Text(
-                                    comment['user_name'] ?? 'Unknown User',
-                                    style: TextStyle(
-                                        fontWeight: FontWeight.bold,
-                                        fontSize: 16),
-                                  ),
-                                  Spacer(),
-                                  Text(
-                                    comment['date_posted'] ?? '',
-                                    style: TextStyle(
-                                      fontSize: 12,
-                                      color: Colors.grey,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                              SizedBox(height: 10),
-                              Text(
-                                comment['body'],
-                                style: TextStyle(fontSize: 14),
-                              ),
-                              SizedBox(height: 10),
-                              Row(
-                                mainAxisAlignment: MainAxisAlignment.end,
-                                children: [
-                                  IconButton(
-                                    icon: Icon(
-                                      (comment['liked'] ?? false)
-                                          ? Icons.favorite
-                                          : Icons.favorite_border,
-                                      color: (comment['liked'] ?? false)
-                                          ? Colors.red
-                                          : Colors.grey,
-                                    ),
-                                    onPressed: () {
-                                      _toggleLike(comment['id'], index);
-                                    },
-                                  ),
-                                  Text(
-                                    '${comment['likes_count']}',
-                                    style: TextStyle(fontSize: 16),
-                                  ),
-                                ],
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    );
-                  },
                 ),
+                IconButton(
+                  icon: const Icon(Icons.send, color: Colors.blue),
+                  onPressed: () => _viewModel.addComment(
+                      widget, _commentController.text.trim()),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
