@@ -1,6 +1,6 @@
-// ignore_for_file: prefer_const_constructors, use_key_in_widget_constructors, use_build_context_synchronously
+// ignore_for_file: prefer_const_constructors, use_build_context_synchronously
 import 'package:flutter/material.dart';
-import './homePage.dart';
+import 'homePage.dart'; // تأكد من أن هذا المسار صحيح
 import '../viewmodels/login_viewmodel.dart';
 
 class LoginPage extends StatefulWidget {
@@ -16,31 +16,8 @@ class LoginPageState extends State<LoginPage> {
   final LoginViewModel _loginViewModel = LoginViewModel();
   bool isLoading = false;
 
-  Future<void> _login() async {
-    setState(() {
-      isLoading = true;
-    });
-
-    try {
-      await _loginViewModel.login(
-        _emailController.text,
-        _passwordController.text,
-      );
-
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (context) => HomePage()),
-      );
-    } catch (e) {
-      _showErrorDialog(e.toString());
-    } finally {
-      setState(() {
-        isLoading = false;
-      });
-    }
-  }
-
-  void _showErrorDialog(String message) {
+  // عرض رسالة الخطأ
+  void showErrorDialog(String message) {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
@@ -54,6 +31,36 @@ class LoginPageState extends State<LoginPage> {
         ],
       ),
     );
+  }
+
+  // دالة تسجيل الدخول
+  Future<void> _login() async {
+    setState(() {
+      isLoading = true;
+    });
+
+    try {
+      final user = await _loginViewModel.login(
+        _emailController.text,
+        _passwordController.text,
+      );
+
+      if (user?.status == "success") {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+              builder: (context) => HomePage()), // يجب تعريف HomePage
+        );
+      } else {
+        showErrorDialog("Login failed");
+      }
+    } catch (e) {
+      showErrorDialog(e.toString());
+    } finally {
+      setState(() {
+        isLoading = false;
+      });
+    }
   }
 
   @override
@@ -99,7 +106,8 @@ class LoginPageState extends State<LoginPage> {
               ),
               SizedBox(height: 30),
               ElevatedButton(
-                onPressed: _login,
+                onPressed:
+                    isLoading ? null : _login, // تعطيل الزر أثناء التحميل
                 style: ElevatedButton.styleFrom(
                   padding: EdgeInsets.symmetric(horizontal: 50, vertical: 15),
                   textStyle: TextStyle(fontSize: 18),

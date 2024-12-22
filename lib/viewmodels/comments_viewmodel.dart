@@ -2,7 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
-import '../classes/comment.dart';
+import '/classes/comment.dart';
 
 class CommentsViewModel {
   final StreamController<List<Comment>> _commentsController =
@@ -27,6 +27,8 @@ class CommentsViewModel {
         final data = json.decode(response.body)['comments'] as List;
 
         List<Comment> fetchedComments = [];
+    
+        
         for (var commentJson in data) {
           final likesUrl =
               "http://feeds.ppu.edu/api/v1/courses/$courseId/sections/$sectionId/posts/$postId/comments/${commentJson['id']}/likes";

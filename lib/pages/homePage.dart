@@ -1,7 +1,9 @@
+// ignore_for_file: prefer_const_constructors
+
 import 'package:flutter/material.dart';
-import 'package:flutter_application_3/pages/coursesPage.dart';
-import 'package:flutter_application_3/viewmodels/home_viewmodel.dart';
-import '../classes/course.dart';
+import '/viewmodels/home_viewmodel.dart';
+import '/classes/subscription.dart';
+import 'coursesPage.dart';
 import 'postsPage.dart';
 
 class HomePage extends StatefulWidget {
@@ -10,36 +12,61 @@ class HomePage extends StatefulWidget {
 }
 
 class HomePageState extends State<HomePage> {
-  final HomeViewModel _viewModel = HomeViewModel();
-  List<Course> subscribedCourses = [];
+  final HomeViewModel viewModel = HomeViewModel();
+  List<Subscription> subscriptions = [];
   bool isLoading = true;
 
   @override
   void initState() {
     super.initState();
-    _fetchSubscribedCourses();
+    fetchSubscriptions();
   }
 
-  // جلب الشعب المشتركة
-  Future<void> _fetchSubscribedCourses() async {
+  // جلب بيانات الاشتراكات
+  Future<void> fetchSubscriptions() async {
     try {
-      final fetchedCourses = await _viewModel.fetchSubscribedCourses();
+      final fetchedSubscriptions = await viewModel.fetchSubscribedSections();
       setState(() {
-        subscribedCourses = fetchedCourses;
+        subscriptions = fetchedSubscriptions.reversed.toList();
         isLoading = false;
       });
     } catch (e) {
-      _showErrorDialog("Error fetching subscribed sections: $e");
+      _showErrorDialog("Error fetching subscriptions: $e");
+    }
+  }
+
+  // دالة لجلب البيانات بناءً على النوع
+  Future<dynamic> fetchCourseDetails(String courseName, String type) async {
+    try {
+      final courseDetails = await viewModel.getCourseDetailsByName(courseName);
+      if (type == "course_id") {
+        return int.parse(courseDetails['course_id'].toString());
+      } else if (type == "college_name") {
+        return courseDetails['college_name'];
+      } else {
+        throw Exception(
+            "Invalid type provided. Use 'course_id' or 'college_name'.");
+      }
+    } catch (e) {
+      throw Exception("Error fetching details: $e");
     }
   }
 
   // إلغاء الاشتراك
-  Future<void> _unsubscribe(int courseId, int sectionId) async {
+  Future<void> _unsubscribe(Subscription subscription) async {
     try {
-      await _viewModel.toggleSubscription(courseId, sectionId);
+      await viewModel.unsubscribeSection(
+        subscription.id, // subscriptionId
+        subscription.sectionId, // sectionId
+        fetchCourseDetails(subscription.courseName, "course_id")
+            as int, // courseId
+      );
       setState(() {
-        subscribedCourses.removeWhere((course) => course.id == sectionId);
+        subscriptions.remove(subscription); // إزالة الشعبة من القائمة
       });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Unsubscribed from ${subscription.courseName}")),
+      );
     } catch (e) {
       _showErrorDialog("Error while unsubscribing: $e");
     }
@@ -62,12 +89,43 @@ class HomePageState extends State<HomePage> {
     );
   }
 
+  // تأكيد الإلغاء
+  void _showConfirmationDialog(Subscription subscription) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          content: Text(
+            "Are you sure you want to unsubscribe ?",
+            style: TextStyle(fontSize: 15),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop(); // إغلاق الحوار
+              },
+              child: Text("No"),
+            ),
+            TextButton(
+              onPressed: () async {
+                Navigator.of(context).pop(); // إغلاق الحوار
+                await _unsubscribe(subscription);
+              },
+              child: Text("Yes"),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text("My Subscribed Sections"),
-        backgroundColor: Colors.deepPurple,
+        title: Text("My Subscribed Sections",
+            style: TextStyle(color: Colors.white)),
+        backgroundColor: Colors.redAccent,
       ),
       drawer: Drawer(
         child: ListView(
@@ -75,7 +133,7 @@ class HomePageState extends State<HomePage> {
           children: [
             DrawerHeader(
               decoration: BoxDecoration(
-                color: Colors.deepPurple,
+                color: Colors.redAccent,
               ),
               child: Text(
                 "Menu",
@@ -88,7 +146,9 @@ class HomePageState extends State<HomePage> {
               onTap: () {
                 Navigator.push(
                   context,
-                  MaterialPageRoute(builder: (context) => CoursesPage()),
+                  MaterialPageRoute(
+                    builder: (context) => CoursesPage(),
+                  ),
                 );
               },
             ),
@@ -97,38 +157,59 @@ class HomePageState extends State<HomePage> {
       ),
       body: isLoading
           ? Center(child: CircularProgressIndicator())
-          : subscribedCourses.isEmpty
-              ? Center(child: Text("No subscribed sections found."))
+          : subscriptions.isEmpty
+              ? Center(child: Text("No subscriptions found."))
               : ListView.builder(
-                  itemCount: subscribedCourses.length,
+                  itemCount: subscriptions.length,
                   itemBuilder: (context, index) {
-                    final course = subscribedCourses[index];
+                    final subscription = subscriptions[index];
                     return Card(
                       margin: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                       child: ListTile(
                         leading: CircleAvatar(
-                          backgroundColor: Colors.deepPurple,
+                          backgroundColor: Colors.redAccent,
                           child: Text(
-                            course.name.isNotEmpty
-                                ? course.name[0]
-                                : "S", // عرض أول حرف من اسم الشعبة
+                            subscription.courseName.isNotEmpty
+                                ? subscription.courseName[0]
+                                : "C",
                             style: TextStyle(color: Colors.white),
                           ),
                         ),
-                        title: Text(course.name),
-                        subtitle: Text("Section: ${course.college}"),
+                        title: Text(subscription.courseName),
+                        subtitle: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text("Section: ${subscription.sectionName}"),
+                            Text("Lecturer: ${subscription.lecturer}"),
+                            FutureBuilder(
+                              future: fetchCourseDetails(
+                                  subscription.courseName, "college_name"),
+                              builder: (context, snapshot) {
+                                if (snapshot.connectionState ==
+                                    ConnectionState.waiting) {
+                                  return Text("Loading College Name...");
+                                } else if (snapshot.hasError) {
+                                  return Text("Error: ${snapshot.error}");
+                                } else {
+                                  return Text("College Name: ${snapshot.data}");
+                                }
+                              },
+                            ),
+                          ],
+                        ),
                         trailing: IconButton(
                           icon: Icon(Icons.delete, color: Colors.redAccent),
-                          onPressed: () =>
-                              _unsubscribe(course.collegeId, course.id),
+                          onPressed: () {
+                            _showConfirmationDialog(subscription);
+                          },
                         ),
                         onTap: () {
                           Navigator.push(
                             context,
                             MaterialPageRoute(
                               builder: (context) => CoursePostsScreen(
-                                courseId: course.collegeId,
-                                sectionId: course.id,
+                                courseId: subscription.id,
+                                sectionId: subscription.sectionId,
                               ),
                             ),
                           );

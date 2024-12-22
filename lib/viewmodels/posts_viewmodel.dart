@@ -1,18 +1,21 @@
 import 'package:http/http.dart' as http;
-import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
-import '../classes/post.dart';
+import 'dart:convert';
+import '/classes/post.dart';
 
 class CoursePostsViewModel {
   final int courseId;
   final int sectionId;
+
   CoursePostsViewModel({required this.courseId, required this.sectionId});
 
+  // جلب التوكن من SharedPreferences
   Future<String?> _getToken() async {
     final prefs = await SharedPreferences.getInstance();
     return prefs.getString('token');
   }
 
+  // جلب جميع المنشورات الخاصة بالدورة والشعبة
   Future<List<Post>> fetchPosts() async {
     try {
       final token = await _getToken();
@@ -33,6 +36,7 @@ class CoursePostsViewModel {
     }
   }
 
+  // جلب تفاصيل منشور معين
   Future<Post> fetchPostDetails(int postId) async {
     try {
       final token = await _getToken();
@@ -53,6 +57,7 @@ class CoursePostsViewModel {
     }
   }
 
+  // إضافة منشور جديد
   Future<int> addPost(String postContent) async {
     if (postContent.isEmpty) {
       throw Exception("Post content cannot be empty.");
@@ -81,6 +86,7 @@ class CoursePostsViewModel {
     }
   }
 
+  // تحديث منشور موجود
   Future<String> updatePost(int postId, String updatedContent) async {
     if (updatedContent.isEmpty) {
       throw Exception("Updated content cannot be empty.");
@@ -106,6 +112,27 @@ class CoursePostsViewModel {
       }
     } catch (e) {
       throw Exception("An error occurred: $e");
+    }
+  }
+
+  // جلب التعليقات لمنشور معين
+  Future<int> fetchCommentsCount(int postId) async {
+    try {
+      final token = await _getToken();
+      final response = await http.get(
+        Uri.parse(
+            "http://feeds.ppu.edu/api/v1/courses/$courseId/sections/$sectionId/posts/$postId/comments"),
+        headers: {'Authorization': token ?? ''},
+      );
+
+      if (response.statusCode == 200) {
+        final comments = json.decode(response.body)['comments'] as List;
+        return comments.length; // عدد التعليقات
+      } else {
+        throw Exception("Failed to fetch comments.");
+      }
+    } catch (e) {
+      throw Exception("An error occurred while fetching comments: $e");
     }
   }
 }

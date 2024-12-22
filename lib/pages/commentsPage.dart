@@ -43,7 +43,11 @@ class _CommentsPageState extends State<CommentsPage> {
         children: [
           Row(
             children: [
-              CircleAvatar(child: Text(comment.author[0].toUpperCase())),
+              CircleAvatar(
+                backgroundColor: Colors.redAccent,
+                child: Text(comment.author[0].toUpperCase(),
+                    style: TextStyle(color: Colors.white)),
+              ),
               const SizedBox(width: 10),
               Column(
                 crossAxisAlignment: CrossAxisAlignment.start,

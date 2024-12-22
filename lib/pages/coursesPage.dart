@@ -17,10 +17,10 @@ class _CoursesPageState extends State<CoursesPage> {
   @override
   void initState() {
     super.initState();
-    _loadData();
+    loadData();
   }
 
-  Future<void> _loadData() async {
+  Future<void> loadData() async {
     setState(() => isLoading = true);
     await viewModel.fetchSubscribedSections(); // جلب الشعب المشتركة
     await viewModel.fetchCourses(); // جلب جميع الكورسات
@@ -48,14 +48,17 @@ class _CoursesPageState extends State<CoursesPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text("Feeds Screen"),
-        backgroundColor: Colors.deepPurple,
+        title: Text(
+          "Feeds Screen",
+          style: TextStyle(color: Colors.white),
+        ),
+        backgroundColor: Colors.redAccent,
       ),
       drawer: Drawer(
         child: ListView(
           children: [
             DrawerHeader(
-              decoration: BoxDecoration(color: Colors.deepPurple),
+              decoration: BoxDecoration(color: Colors.redAccent),
               child: Center(
                 child: Text(
                   "My App",
@@ -91,23 +94,18 @@ class _CoursesPageState extends State<CoursesPage> {
                     children: [
                       ListTile(
                         leading: CircleAvatar(
-                          backgroundColor: Colors.deepPurpleAccent,
+                          backgroundColor: Colors.redAccent,
                           child: Text(
                             course.name.substring(0, 2).toUpperCase(),
                             style: TextStyle(color: Colors.white),
                           ),
                         ),
                         title: Text(course.name),
-                        subtitle: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text("College: ${course.college}"),
-                          ],
-                        ),
+                        subtitle: Text("College: ${course.college}"),
                         trailing: IconButton(
                           icon: Icon(
                             isExpanded ? Icons.expand_less : Icons.expand_more,
-                            color: Colors.deepPurple,
+                            color: Colors.redAccent,
                           ),
                           onPressed: () => _toggleCourseExpansion(course.id),
                         ),
@@ -115,16 +113,7 @@ class _CoursesPageState extends State<CoursesPage> {
                       if (isExpanded)
                         Column(
                           children: [
-                            if (viewModel.sections[course.id] == null)
-                              Padding(
-                                padding: const EdgeInsets.all(8.0),
-                                child: Text(
-                                  "No sections available for this course.",
-                                  style: TextStyle(
-                                      color: Colors.grey, fontSize: 16),
-                                ),
-                              )
-                            else if (viewModel.sections[course.id]!.isEmpty)
+                            if (viewModel.sections[course.id]!.isEmpty)
                               Padding(
                                 padding: const EdgeInsets.all(8.0),
                                 child: Text(

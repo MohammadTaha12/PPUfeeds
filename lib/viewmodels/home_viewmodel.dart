@@ -1,13 +1,13 @@
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
-import '../classes/course.dart';
+import '../classes/subscription.dart';
 
 class HomeViewModel {
-  List<Course> subscribedCourses = [];
+  List<Subscription> subscriptions = [];
 
-  // جلب التوكن
-  Future<String> _getToken() async {
+  // جلب التوكن من SharedPreferences
+  Future<String> getToken() async {
     final prefs = await SharedPreferences.getInstance();
     final token = prefs.getString('token');
     if (token == null || token.isEmpty) {
@@ -16,9 +16,9 @@ class HomeViewModel {
     return token;
   }
 
-  // جلب الشعب المشتركة
-  Future<List<Course>> fetchSubscribedCourses() async {
-    final token = await _getToken();
+  // جلب الاشتراكات المشتركة
+  Future<List<Subscription>> fetchSubscribedSections() async {
+    final token = await getToken();
     try {
       final response = await http.get(
         Uri.parse("http://feeds.ppu.edu/api/v1/subscriptions"),
@@ -30,14 +30,9 @@ class HomeViewModel {
         if (responseBody != null && responseBody['subscriptions'] != null) {
           final data = responseBody['subscriptions'] as List;
 
-          // تحويل البيانات إلى قائمة كورسات
-          subscribedCourses = data.map((item) {
-            return Course(
-              id: item['section_id'] ?? 0,
-              name: item['course'] ?? "No Name",
-              college: item['section'] ?? "No Section",
-              collegeId: item['id'] ?? 0,
-            );
+          // تحويل البيانات إلى قائمة اشتراكات
+          subscriptions = data.map((item) {
+            return Subscription.fromJson(item);
           }).toList();
         }
       } else {
@@ -47,14 +42,15 @@ class HomeViewModel {
     } catch (e) {
       throw Exception("Error fetching subscriptions: $e");
     }
-    return subscribedCourses;
+    return subscriptions;
   }
 
-  // إلغاء الاشتراك من الشعبة
-  Future<void> toggleSubscription(int courseId, int sectionId) async {
-    final token = await _getToken();
+  // إلغاء الاشتراك من شعبة
+  Future<void> unsubscribeSection(
+      int courseId, int sectionId, int subscriptionId) async {
+    final token = await getToken();
     final url =
-        "http://feeds.ppu.edu/api/v1/courses/$courseId/sections/$sectionId/subscribe/$sectionId";
+        "http://feeds.ppu.edu/api/v1/courses/$courseId/sections/$sectionId/subscribe/$subscriptionId";
 
     try {
       final response = await http.delete(
@@ -63,13 +59,57 @@ class HomeViewModel {
       );
 
       if (response.statusCode == 200) {
-        print("Successfully unsubscribed from section $sectionId");
+        print("Successfully unsubscribed from subscription $subscriptionId");
       } else {
         throw Exception(
             "Failed to unsubscribe. Status code: ${response.statusCode}");
       }
     } catch (e) {
       throw Exception("Error while unsubscribing: $e");
+    }
+  }
+
+  // البحث عن تفاصيل الكورس باستخدام اسم الكورس
+  Future<Map<String, dynamic>> getCourseDetailsByName(String courseName) async {
+    try {
+      final token = await getToken();
+
+      // جلب جميع الكورسات
+      final response = await http.get(
+        Uri.parse("http://feeds.ppu.edu/api/v1/courses"),
+        headers: {'Authorization': token},
+      );
+
+      if (response.statusCode != 200) {
+        throw Exception("Failed to fetch courses");
+      }
+
+      final coursesData = json.decode(response.body);
+
+      if (coursesData['courses'] == null) {
+        throw Exception("Courses not found");
+      }
+
+      // البحث عن الكورس باستخدام الاسم
+      final course = (coursesData['courses'] as List).firstWhere(
+        (c) => c['name'] == courseName,
+        orElse: () => null,
+      );
+
+      if (course == null) {
+        throw Exception("Course with name $courseName not found");
+      }
+
+      // جمع البيانات المطلوبة
+      final int courseId = course['id'];
+      final String collegeName = course['college'];
+
+      return {
+        "course_id": courseId,
+        "college_name": collegeName,
+      };
+    } catch (e) {
+      throw Exception("Error fetching course by name: $e");
     }
   }
 }

@@ -1,8 +1,7 @@
-// ignore_for_file: prefer_const_constructors
-
+// ignore_for_file: prefer_const_constructors, library_private_types_in_public_api
 import 'package:flutter/material.dart';
 import '/viewmodels/posts_viewmodel.dart';
-import '../classes/post.dart';
+import '/classes/post.dart';
 import 'commentsPage.dart';
 
 class CoursePostsScreen extends StatefulWidget {
@@ -12,10 +11,10 @@ class CoursePostsScreen extends StatefulWidget {
   const CoursePostsScreen({required this.courseId, required this.sectionId});
 
   @override
-  _CoursePostsScreenState createState() => _CoursePostsScreenState();
+  CoursePostsScreenState createState() => CoursePostsScreenState();
 }
 
-class _CoursePostsScreenState extends State<CoursePostsScreen> {
+class CoursePostsScreenState extends State<CoursePostsScreen> {
   final TextEditingController _postController = TextEditingController();
   final TextEditingController _editPostController = TextEditingController();
   bool isLoading = true;
@@ -31,17 +30,18 @@ class _CoursePostsScreenState extends State<CoursePostsScreen> {
       courseId: widget.courseId,
       sectionId: widget.sectionId,
     );
-    _fetchPosts();
+    fetchPosts();
   }
 
-  Future<void> _fetchPosts() async {
+  Future<void> fetchPosts() async {
     setState(() {
       isLoading = true;
     });
     try {
       posts = await viewModel.fetchPosts();
+      posts = posts.reversed.toList();
     } catch (e) {
-      _showErrorDialog("Failed to load posts: $e");
+      showErrorDialog("Failed to load posts: $e");
     } finally {
       setState(() {
         isLoading = false;
@@ -52,15 +52,15 @@ class _CoursePostsScreenState extends State<CoursePostsScreen> {
   Future<void> _addPost() async {
     final postContent = _postController.text.trim();
     if (postContent.isEmpty) {
-      _showErrorDialog("Post content cannot be empty.");
+      showErrorDialog("Post content cannot be empty.");
       return;
     }
     try {
       await viewModel.addPost(postContent);
       _postController.clear();
-      _fetchPosts();
+      fetchPosts();
     } catch (e) {
-      _showErrorDialog("Failed to add post: $e");
+      showErrorDialog("Failed to add post: $e");
     }
   }
 
@@ -73,13 +73,13 @@ class _CoursePostsScreenState extends State<CoursePostsScreen> {
         editingPostId = null;
         _editPostController.clear();
       });
-      _fetchPosts();
+      fetchPosts();
     } catch (e) {
-      _showErrorDialog("Failed to update post: $e");
+      showErrorDialog("Failed to update post: $e");
     }
   }
 
-  void _showErrorDialog(String message) {
+  void showErrorDialog(String message) {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
@@ -95,7 +95,7 @@ class _CoursePostsScreenState extends State<CoursePostsScreen> {
     );
   }
 
-  Widget _buildAddPostSection() {
+  Widget buildAddPostSection() {
     return Padding(
       padding: const EdgeInsets.all(8.0),
       child: Column(
@@ -173,7 +173,7 @@ class _CoursePostsScreenState extends State<CoursePostsScreen> {
     );
   }
 
-  Widget _buildPostItem(Post post) {
+  Widget buildPostItem(Post post) {
     return Card(
       margin: EdgeInsets.symmetric(vertical: 8, horizontal: 12),
       elevation: 3,
@@ -185,8 +185,11 @@ class _CoursePostsScreenState extends State<CoursePostsScreen> {
         children: [
           ListTile(
             leading: CircleAvatar(
-              backgroundColor: Colors.grey.shade300,
-              child: Text(post.author[0].toUpperCase()),
+              backgroundColor: Colors.redAccent,
+              child: Text(
+                post.author[0].toUpperCase(),
+                style: TextStyle(color: Colors.white),
+              ),
             ),
             title: Text(
               post.author,
@@ -258,31 +261,52 @@ class _CoursePostsScreenState extends State<CoursePostsScreen> {
                     style: TextStyle(fontSize: 16),
                   ),
           ),
-          Align(
-            alignment: Alignment.centerRight,
-            child: Padding(
-              padding: const EdgeInsets.only(right: 16, bottom: 10),
-              child: ElevatedButton.icon(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.redAccent,
+          GestureDetector(
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => CommentsPage(
+                    courseId: widget.courseId,
+                    sectionId: widget.sectionId,
+                    postId: post.id,
+                  ),
                 ),
-                onPressed: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => CommentsPage(
-                        courseId: widget.courseId,
-                        sectionId: widget.sectionId,
-                        postId: post.id,
+              );
+            },
+            child: Container(
+              alignment: Alignment.centerLeft,
+              margin: const EdgeInsets.only(left: 16, right: 16, bottom: 10),
+              padding: const EdgeInsets.all(12.0),
+              decoration: BoxDecoration(
+                color: const Color.fromARGB(255, 255, 253, 253),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(
+                  color: const Color.fromARGB(255, 218, 209, 209),
+                  width: 1,
+                ),
+              ),
+              child: FutureBuilder<int>(
+                future: viewModel.fetchCommentsCount(post.id),
+                builder: (context, snapshot) {
+                  if (snapshot.hasError) {
+                    return Text(
+                      "Error",
+                      style: TextStyle(
+                        color: Colors.black,
+                        fontWeight: FontWeight.bold,
                       ),
-                    ),
-                  );
+                    );
+                  } else {
+                    return Text(
+                      "${snapshot.data} class comments",
+                      style: TextStyle(
+                        color: Colors.grey,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    );
+                  }
                 },
-                icon: Icon(Icons.comment, color: Colors.white),
-                label: Text(
-                  "View Comments",
-                  style: TextStyle(color: Colors.white),
-                ),
               ),
             ),
           ),
@@ -295,12 +319,12 @@ class _CoursePostsScreenState extends State<CoursePostsScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text("Posts"),
+        title: Text("Posts", style: TextStyle(color: Colors.white)),
         backgroundColor: Colors.redAccent,
       ),
       body: Column(
         children: [
-          _buildAddPostSection(),
+          buildAddPostSection(),
           Expanded(
             child: isLoading
                 ? Center(child: CircularProgressIndicator())
@@ -309,7 +333,7 @@ class _CoursePostsScreenState extends State<CoursePostsScreen> {
                     : ListView.builder(
                         itemCount: posts.length,
                         itemBuilder: (context, index) {
-                          return _buildPostItem(posts[index]);
+                          return buildPostItem(posts[index]);
                         },
                       ),
           ),

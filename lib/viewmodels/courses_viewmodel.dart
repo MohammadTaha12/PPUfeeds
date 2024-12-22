@@ -1,8 +1,8 @@
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
-import '../classes/course.dart';
-import '../classes/section.dart';
+import '/classes/course.dart';
+import '/classes/section.dart';
 
 class CoursesViewModel {
   List<Course> courses = [];
@@ -65,7 +65,8 @@ class CoursesViewModel {
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body)['subscriptions'] as List;
-        for (var item in data) {
+        for (int i = 0; i < data.length; i++) {
+          var item = data[i];
           subscriptions[item['section_id']] = item['id'];
         }
       }

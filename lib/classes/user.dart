@@ -1,19 +1,23 @@
 class User {
-  final String email;
-  final String username;
+  final String status;
   final String sessionToken;
+  final int userId;
+  final String username;
 
   User({
-    required this.email,
+    required this.userId,
     required this.username,
     required this.sessionToken,
+    required this.status,
   });
 
   factory User.fromJson(Map<String, dynamic> json) {
     return User(
-      email: json['email'] ?? '',
-      username: json['username'] ?? '',
-      sessionToken: json['session_token'] ?? '',
+      status: json['status'],
+      sessionToken: json['session_token'],
+      username: json['username'],
+      userId: int.parse(json[
+          'user_id']), // التحقق من نوع userId وتحويله إلى int إذا لزم الأمر
     );
   }
 }

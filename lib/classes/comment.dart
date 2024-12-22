@@ -3,8 +3,8 @@ class Comment {
   final String body;
   final String datePosted;
   final String author;
-  int likesCount; // عدد اللايكات
-  bool isLiked; // حالة الإعجاب
+  int likesCount;
+  bool isLiked;
 
   Comment({
     required this.id,
@@ -17,12 +17,12 @@ class Comment {
 
   factory Comment.fromJson(Map<String, dynamic> json) {
     return Comment(
-      id: json['id'] ?? 0, // وضع قيمة افتراضية 0 في حال كان null
-      body: json['body'] ?? "No content", // نص افتراضي في حال كان null
+      id: json['id'] ?? 0,
+      body: json['body'] ?? "No content",
       datePosted: json['date_posted'] ?? "Unknown date",
       author: json['author'] ?? "Unknown author",
-      likesCount: json['likes_count'] ?? 0, // قيمة افتراضية 0 لعدد اللايكات
-      isLiked: json['liked'] ?? false, // قيمة افتراضية false لحالة الإعجاب
+      likesCount: json['likes_count'] ?? 0,
+      isLiked: json['liked'] ?? false,
     );
   }
 }
