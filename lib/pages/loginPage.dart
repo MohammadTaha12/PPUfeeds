@@ -34,7 +34,7 @@ class LoginPageState extends State<LoginPage> {
   }
 
   // دالة تسجيل الدخول
-  Future<void> _login() async {
+  Future<void> login() async {
     setState(() {
       isLoading = true;
     });
@@ -106,8 +106,7 @@ class LoginPageState extends State<LoginPage> {
               ),
               SizedBox(height: 30),
               ElevatedButton(
-                onPressed:
-                    isLoading ? null : _login, // تعطيل الزر أثناء التحميل
+                onPressed: isLoading ? null : login, // تعطيل الزر أثناء التحميل
                 style: ElevatedButton.styleFrom(
                   padding: EdgeInsets.symmetric(horizontal: 50, vertical: 15),
                   textStyle: TextStyle(fontSize: 18),

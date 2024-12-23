@@ -31,7 +31,7 @@ class HomePageState extends State<HomePage> {
         isLoading = false;
       });
     } catch (e) {
-      _showErrorDialog("Error fetching subscriptions: $e");
+      showErrorDialog("Error fetching subscriptions: $e");
     }
   }
 
@@ -53,7 +53,7 @@ class HomePageState extends State<HomePage> {
   }
 
   // إلغاء الاشتراك
-  Future<void> _unsubscribe(Subscription subscription) async {
+  Future<void> unsubscribe(Subscription subscription) async {
     try {
       await viewModel.unsubscribeSection(
         subscription.id, // subscriptionId
@@ -68,12 +68,12 @@ class HomePageState extends State<HomePage> {
         SnackBar(content: Text("Unsubscribed from ${subscription.courseName}")),
       );
     } catch (e) {
-      _showErrorDialog("Error while unsubscribing: $e");
+      showErrorDialog("Error while unsubscribing: $e");
     }
   }
 
   // عرض رسالة خطأ
-  void _showErrorDialog(String message) {
+  void showErrorDialog(String message) {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
@@ -90,7 +90,7 @@ class HomePageState extends State<HomePage> {
   }
 
   // تأكيد الإلغاء
-  void _showConfirmationDialog(Subscription subscription) {
+  void showConfirmationDialog(Subscription subscription) {
     showDialog(
       context: context,
       builder: (BuildContext context) {
@@ -109,7 +109,7 @@ class HomePageState extends State<HomePage> {
             TextButton(
               onPressed: () async {
                 Navigator.of(context).pop(); // إغلاق الحوار
-                await _unsubscribe(subscription);
+                await unsubscribe(subscription);
               },
               child: Text("Yes"),
             ),
@@ -200,7 +200,7 @@ class HomePageState extends State<HomePage> {
                         trailing: IconButton(
                           icon: Icon(Icons.delete, color: Colors.redAccent),
                           onPressed: () {
-                            _showConfirmationDialog(subscription);
+                            showConfirmationDialog(subscription);
                           },
                         ),
                         onTap: () {

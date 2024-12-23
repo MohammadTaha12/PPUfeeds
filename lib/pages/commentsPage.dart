@@ -1,3 +1,5 @@
+// ignore_for_file: use_key_in_widget_constructors
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../viewmodels/comments_viewmodel.dart';
@@ -12,8 +14,7 @@ class CommentsPage extends StatefulWidget {
     required this.courseId,
     required this.sectionId,
     required this.postId,
-    Key? key,
-  }) : super(key: key);
+  });
 
   @override
   State<CommentsPage> createState() => _CommentsPageState();
